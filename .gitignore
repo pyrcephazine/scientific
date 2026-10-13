@@ -1,0 +1,18 @@
+# Bulk cluster assets and working state (if symlinked or mounted under root)
+/cache/
+/scratch/
+/weights/
+
+# SQLite operational sidecars: preserve for recovery; do not commit
+/index.db-journal
+/index.db-wal
+/index.db-shm
+
+# Installed environments and Python artifacts
+.venv/
+__pycache__/
+*.pyc
+
+# Local credentials
+.env
+.env.*
