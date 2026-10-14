@@ -1,7 +1,7 @@
 # Bulk cluster assets and working state (if symlinked or mounted under root)
-/cache/
-/scratch/
-/weights/
+/cache
+/scratch
+/weights
 
 # SQLite operational sidecars: preserve for recovery; do not commit
 /index.db-journal
