@@ -1,4 +1,6 @@
-# Scientific research protocol
+This `AGENTS.md` document begins with a specification for broad scientific research. Additional instructions that belong to `AGENTS.md` may be appended to the bottom of this document.
+
+# Scientific research specification
 
 Last updated: 13 October 2026
 
@@ -9,8 +11,6 @@ Possible causes include biases in the training data for large language models, t
 In any case, the symptom is a tendency for AI agents to build complex state manifests and plumbing without an intuitive grasp of the cognitive and maintenance load they entail. The solution is to adopt a specification that deliberately enforces simplicity while maintaining an appropriate level of infrastructure for scientific studies. By strictly limiting the number, type, and role of allowable files and by explicitly forbidding superfluous scaffolding, we can compel agents to prioritize the actual scientific work and results therefrom.
 
 This document outlines one such specification for scientific projects and experiments. IF A PROBLEM DURING A PROJECT REQUIRES AN AMENDMENT TO THESE RULES, THE REQUESTING AGENT MUST CLEARLY JUSTIFY, EXPLAIN, AND DEFINE THE CHANGE TO THE USER. AFTER CORRECTIONS AND ONLY AFTER RECEIVING EXPLICIT APPROVAL MAY THE AGENT EDIT THE RELEVANT SECTION OF `AGENTS.md`, AND MUST LOG THE DEVIATION UNDER [RECORD OF DEVIATIONS](#record-of-deviations).
-
----
 
 ## 1. Roles
 
@@ -36,8 +36,6 @@ Both LOCAL and CLUSTER may read all tracked files in this specification. As a re
 
 In particular, neither domain should generate authorization files, dispatch queues, heartbeat files, state snapshots, deployment manifests, consolidation flags, or completion tickets when the necessary facts already belong in `index.db`, Git history, the live job scheduler, or scientific documents. Only useful scientific information belongs in experiment files. Agent state, credentials, and installed virtual environments (`.venv/`) are not such scientific artifacts, so do not track them.
 
----
-
 ## 2. Definitions
 
 Throughout this specification, a **project** refers to the entire body of work. An **experiment** (recorded as a row in the `experiments` table of `index.db` keyed by `experiment_id`) refers to a single, frozen scientific configuration, its execution, and its output under `experiments/<experiment_id>/` that contributes evidence toward the project's goals as may be inferred from context or outlined in `MOTIVATION.md`. Each experiment has one, and only one, purpose. Altering any scientific parameter or executable code creates a new `experiment_id`, whereas retrying an unchanged configuration and pinned `code_commit` after a transient runtime error simply replaces the active `dispatch_id` of the existing experiment. A retry preserves the frozen specification and code version whereas a correction requiring a different code version receives a new `experiment_id`, with its relationship to the original recorded in `experiments/<experiment_id>/README.md`.
@@ -45,8 +43,6 @@ Throughout this specification, a **project** refers to the entire body of work. 
 The final record of the project's scientific claims is held by four root-level Markdown documents maintained exclusively by LOCAL. `MOTIVATION.md` establishes the high-level scientific goals, scope, and primary research questions and should change only sparingly throughout the course of the project; any change to `MOTIVATION.md` requires explicit permission from the human user. As CLUSTER completes experiments, LOCAL reads the resulting `experiments/<experiment_id>/README.md` narratives and numerical artifacts, compares them against existing claims, and synthesizes the findings—including null, adverse, and contradictory outcomes—into `THEORY.md` and `EMPIRICAL_EVIDENCE.md`. Git commit history and inline `experiment_id` citations serve as the sole record of this consolidation; no consolidation table or acknowledgement file is permitted, because experiments may be re-evaluated and incorporated more than once if subsequent findings call earlier interpretations into question. Meanwhile, `PRIOR_WORK.md` is kept strictly separate from `THEORY.md` to create a structure that encourages novelty; whenever a derivation or empirical result already covered by existing literature is uncovered, it must be cited in `PRIOR_WORK.md` with a corresponding entry in `references.bib` rather than appended to `THEORY.md`.
 
 Within CLUSTER, execution is divided between a single **supervisor** and one or more distributed **workers**. All executable source code, model architectures, and environment definitions reside in `src/` and `tools/`, whereas `experiments/<experiment_id>/` directories serve as records of execution and empirical results and never house experiment code. The supervisor is the sole actor permitted to modify and commit to `src/` and `tools/`. When planning a new experiment within its assigned scope, the supervisor reads the canonical synthesis documents, implements, commits, and pushes any required code changes in `src/` or `tools/` to `origin/main` to obtain a shared, immutable `code_commit` hash, freezes the experiment specification (`spec_json`), serializes its registration into `index.db`, and dispatches the job. Distributed workers are strictly read-only consumers of `src/`, `tools/`, and shared caches: each worker executes the pinned `code_commit` (materialized into its isolated `scratch/<experiment_id>/<dispatch_id>/` workspace via `git archive` or a detached worktree so concurrent supervisor edits on the main checkout never affect running jobs) and never writes directly to `src/`, `index.db`, or `experiments/`.
-
----
 
 ## 3. Repository Layout
 
@@ -89,8 +85,6 @@ The root directory may contain only `.gitignore`, `.gitattributes`, the six Mark
 
 All shared library code, model architectures, and environment specifications belong in `src/`, while utility scripts for repetitive tasks—such as dataset preparation, schema migrations, or interacting with Slurm—belong in `tools/`. Each `experiments/<experiment_id>/` directory is independently owned by CLUSTER and holds a single `README.md`—recording the experimental rationale, execution notes, and initial analysis—alongside compact scientific result files in whatever format is scientifically appropriate (such as `.csv`, `.parquet`, `.npz`, or `.npy`). Source code, scripts, and virtual environments must never be placed inside `experiments/`. Finally, when a manuscript is prepared, its TeX sources and figures reside in a dedicated `<author-year-paper-title>/` directory at the repository root (using the full or short paper title), which CLUSTER must never edit.
 
----
-
 ## 4. Storage and Cache
 
 High-performance computing environments typically separate persistent bulk storage (often `$WORK`) from high-bandwidth temporary storage (`$SCRATCH`), both of which are distinct from the user's LOCAL machine. Rather than cloning the Git repository onto every storage device, the Git repository is cloned at most once on LOCAL and once on CLUSTER. Untracked bulk assets (`cache/` and `weights/`) and disposable execution workspaces (`scratch/`) live in external storage roots on the cluster.
@@ -120,8 +114,6 @@ If a project runs on hardware with fewer than three distinct storage devices (fo
 While `cache/` and `weights/` must physically reside on persistent CLUSTER storage, `scratch/` may resolve to shared temporary filesystems or disks present only on each HPC node. Any symlink from CLUSTER into temporary storage inherits that temporary storage's retention risk, and scratch can disappear entirely if the compute node fails. Consequently, any state required for recovery or downstream dependency must have a surviving copy in persistent CLUSTER storage. Even without bulk cluster assets, the tracked LOCAL checkout always retains enough code, specifications, input recipes, and measured evidence to reproduce all analyses and rerun computations once raw inputs are re-acquired. Because rerunning stochastic computation does not recover the exact historical data, the measurements underlying reported claims are always preserved in `experiments/`.
 
 To prevent redundant downloads in `cache/`, datasets, pretrained models, and fixed representations are published once into immutable, project-wide versions indexed in `cache/manifest.json`. Each version is uniquely identified by its raw input or model revision and any other information needed for this purpose. Compute workers consume these published versions strictly read-only and never independently replace or duplicate shared assets. All acquisition and preparation logic must remain reproducible through versioned code in `src/` or `tools/`; any unique input that cannot be programmatically re-downloaded or regenerated requires retained CLUSTER storage and an explicit statement that declares this dependency.
-
----
 
 ## 5. Git, Git LFS, and Synchronization
 
@@ -186,8 +178,6 @@ def query_registry(query: str, params: tuple = ()) -> list:
 ```
 
 Query functions must always return materialized data (`fetchall()`) rather than live connections or cursors. In Python's [`sqlite3`](https://docs.python.org/3/library/sqlite3.html#how-to-use-the-connection-context-manager) module, a connection context manager (`with conn:`) manages transactions but does not close the file handle; wrapping both the connection and cursor in [`contextlib.closing`](https://docs.python.org/3/library/contextlib.html#contextlib.closing) guarantees immediate closure on exit or exception. Opening the [SQLite URI](https://www.sqlite.org/uri.html) with `mode=ro` prevents accidental writes while preserving standard file locking. Never pass `immutable=1` on the URI, as the underlying file may be replaced by Git between queries.
-
----
 
 ## 6. Single-Table Execution Registry (`index.db`)
 
@@ -295,8 +285,6 @@ Before registering an experiment, the supervisor reads the canonical synthesis d
 | `last_execution_issue` | Brief description of the latest technical interruption; retained when a retry is claimed and replaced only by a subsequent fault or explicit correction. |
 | `cancellation_reason` | Mandatory explanation of why the experiment was deliberately discontinued. |
 
----
-
 ## 7. Lifecycle, Dispatch, and Fault Recovery
 
 ### Lifecycle States
@@ -343,8 +331,6 @@ A stale `updated_at` timestamp never proves by itself that an execution has died
 
 Never automatically delete a tracked `experiments/<experiment_id>/` directory, as it may contain preregistered forecasts, preparation notes, or valid observations. Automatic pruning is restricted to disposable `scratch/` workspaces and superseded recovery checkpoints with no unresolved dependencies—never accepted scientific evidence or SQLite recovery sidecars.
 
----
-
 ## 8. Scientific Output Saving and Checkpoint Promotion
 
 During execution, workers write all intermediate outputs and working state to isolated directories under `scratch/<experiment_id>/<dispatch_id>/`. Once computation finishes, the supervisor serializes final output saving and completion against cancellation and redispatch, revalidating `(experiment_id, dispatch_id, status = 'RUNNING')` before promoting checkpoints or overwriting canonical result files:
@@ -359,15 +345,11 @@ During execution, workers write all intermediate outputs and working state to is
 
 Verified output saving (Steps 1–5) and the SQLite completion transaction (Step 6) must be serialized by the single active supervisor against cancellation and redispatch, preceding Git/LFS synchronization (Step 7). If verified output saving finishes for the active `dispatch_id` but the database update is interrupted, the supervisor reconciles and finalizes the database state using the existing validated outputs; if the database update completes but Git/LFS push is interrupted, the supervisor finishes the Git push rather than rerunning the computation.
 
----
-
 ## Record of Deviations
 
 See preamble.
 
 - 13 October 2026: Human-approved consolidation of the specification into `AGENTS.md`, with additional agent instructions at the bottom. File references and the root allowlist were updated; operational rules and the database schema are unchanged.
-
----
 
 ## References
 
