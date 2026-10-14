@@ -140,7 +140,21 @@ class RegistryTests(unittest.TestCase):
         self.assertIn('exclusive', out)
 
     def test_git_hooks_lfs_and_branch_ownership(self):
+        obsolete = self.root / 'SPECIFICATION.md'
+        obsolete.write_text('Historical protocol fixture\n')
+        self.git('add', 'SPECIFICATION.md')
+        self.git('commit', '--quiet', '-m', 'Historical protocol fixture')
         self.tool('setup', '--role', 'LOCAL')
+        obsolete.unlink()
+        self.git('add', '--', 'SPECIFICATION.md')
+        self.git('commit', '--quiet', '-m', 'Retire standalone specification')
+        obsolete.write_text('Must not reintroduce a second protocol\n')
+        self.git('add', 'SPECIFICATION.md')
+        refused = self.git('commit', '-m', 'Must be rejected', check=False)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn('outside AGENTS.md', refused.stderr)
+        self.git('reset', '--quiet', '--', 'SPECIFICATION.md')
+        obsolete.unlink()
         self.git('add', 'index.db')
         refused = self.git('commit', '-m', 'Must be rejected', check=False)
         self.assertNotEqual(refused.returncode, 0)

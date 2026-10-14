@@ -16,7 +16,7 @@ import registry
 
 
 ROOT_FILES = {
-    '.gitignore', '.gitattributes', 'AGENTS.md', 'README.md', 'SPECIFICATION.md',
+    '.gitignore', '.gitattributes', 'AGENTS.md', 'README.md',
     'MOTIVATION.md', 'THEORY.md', 'PRIOR_WORK.md', 'EMPIRICAL_EVIDENCE.md',
     'references.bib', 'index.db',
 }
@@ -33,7 +33,7 @@ def owner(path):
     parts = Path(path).parts
     if len(parts) == 1:
         if path not in ROOT_FILES:
-            raise ValueError(f'Root path is outside SPECIFICATION.md: {path}')
+            raise ValueError(f'Root path is outside AGENTS.md: {path}')
         return 'CLUSTER' if path == 'index.db' else 'LOCAL'
     if parts[0] in {'src', 'tools'}:
         return 'CLUSTER'
@@ -47,13 +47,17 @@ def owner(path):
         return 'CLUSTER'
     if re.fullmatch(r'.+-\d{4}-.+', parts[0]):
         return 'LOCAL'
-    raise ValueError(f'Path is outside SPECIFICATION.md: {path}')
+    raise ValueError(f'Path is outside AGENTS.md: {path}')
 
 
 def guard_commit():
     paths = registry.git(ROOT, 'diff', '--cached', '--name-only', '-z').split('\0')
     current = role()
+    deleted = set(registry.git(ROOT, 'diff', '--cached', '--diff-filter=D', '--name-only', '-z').split('\0'))
     for path in filter(None, paths):
+        # LOCAL may remove obsolete root files outside the current allowlist.
+        if path in deleted and len(Path(path).parts) == 1 and path not in ROOT_FILES and current == 'LOCAL':
+            continue
         if owner(path) != current:
             raise ValueError(f'{current} may not author changes to {path}')
         if path == 'index.db' and registry.git(ROOT, 'branch', '--show-current') != 'main':
