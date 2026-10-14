@@ -1,6 +1,6 @@
 # Scientific project scaffold
 
-This is a blank, reusable implementation of [SPECIFICATION.md](SPECIFICATION.md). It contains an empty SQLite registry, Git/LFS configuration, ownership hooks and small registry utilities. No experiments, scientific claims, remote repository or cluster jobs are configured.
+This is a blank, reusable implementation of [AGENTS.md](AGENTS.md). It contains an empty SQLite registry, Git/LFS configuration, ownership hooks and small registry utilities. No experiments, scientific claims, remote repository or cluster jobs are configured.
 
 ## Start a project
 
@@ -16,8 +16,7 @@ Python 3.10+ on a POSIX system is sufficient for the scaffold; its Python code u
 
 | Path | Purpose |
 |---|---|
-| `SPECIFICATION.md` | Full design and operating contract |
-| `AGENTS.md` | Agent ownership and usage instructions |
+| `AGENTS.md` | Full operating contract and additional agent instructions |
 | `src/schema.sql` | Exact one-table schema and timestamp trigger from the specification |
 | `src/registry.py` | Initialization, locked read-only queries, registration, conditional lifecycle updates and consistent snapshots |
 | `tools/repository.py` | Setup, query, synchronized fast-forward updates and Git ownership hooks |
