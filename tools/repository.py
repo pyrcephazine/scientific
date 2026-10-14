@@ -80,6 +80,15 @@ def guard_push(arguments, payload):
     subprocess.run(['git', '-C', str(ROOT), 'lfs', 'pre-push', *arguments], input=payload, check=True)
 
 
+def standard_lfs_pre_push():
+    manual = subprocess.check_output(['git', '-C', str(ROOT), 'lfs', 'update', '--manual'], text=True)
+    for block in re.findall(r'(?m)(?:^\t.*\n)+', manual):
+        script = ''.join(line[1:] for line in block.splitlines(keepends=True))
+        if script.startswith('#!/bin/sh\n') and script.endswith('git lfs pre-push "$@"\n'):
+            return script
+    raise ValueError('Cannot identify the standard Git LFS pre-push hook; integrate it explicitly')
+
+
 def setup(selected):
     registry.initialize(ROOT)
     subprocess.run(['git', '-C', str(ROOT), 'lfs', 'install', '--local', '--skip-repo'], check=True)
@@ -106,7 +115,8 @@ def setup(selected):
             except (ValueError, IndexError):
                 executable = ''
             generated = prefix + shlex.quote(executable) + suffix
-            if previous != generated or (executable != 'python3' and not Path(executable).is_absolute()):
+            scientific_hook = previous == generated and (executable == 'python3' or Path(executable).is_absolute())
+            if not scientific_hook and not (name == 'pre-push' and previous == standard_lfs_pre_push()):
                 raise ValueError(f'Existing {name} hook must be integrated, not overwritten')
         path.write_text(text)
         path.chmod(0o755)

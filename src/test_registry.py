@@ -238,6 +238,31 @@ class RegistryTests(unittest.TestCase):
         self.assertTrue(hook.is_symlink())
         self.assertIn('exec python3 ', target.read_text())
 
+    def test_fresh_clone_setup_integrates_only_standard_lfs_hook(self):
+        clone = Path(self.temporary.name) / 'clone'
+        subprocess.run(['git', 'clone', '--quiet', str(self.root), str(clone)], check=True)
+        subprocess.run(['git', '-C', str(clone), 'lfs', 'install', '--local'],
+                       check=True, capture_output=True, text=True)
+        hook = clone / '.git/hooks/pre-push'
+        standard = hook.read_text()
+        self.assertIn('git lfs pre-push "$@"', standard)
+        invocation = [sys.executable, str(clone / 'tools/repository.py'), 'setup', '--role', 'CLUSTER']
+        custom = standard + '# Keep custom behavior\n'
+        hook.write_text(custom)
+        refused = subprocess.run(invocation, capture_output=True, text=True)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn('must be integrated', refused.stderr)
+        self.assertEqual(hook.read_text(), custom)
+        hook.write_text(standard)
+        subprocess.run(invocation, check=True, capture_output=True, text=True)
+        installed = hook.read_text()
+        self.assertIn('# scientific repository guard', installed)
+        subprocess.run(invocation, check=True, capture_output=True, text=True)
+        self.assertEqual(hook.read_text(), installed)
+        result = subprocess.run([str(hook), 'origin', str(self.root)], cwd=clone,
+                                input='', capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()
