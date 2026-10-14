@@ -6,6 +6,7 @@ from contextlib import closing
 import json
 from pathlib import Path
 import re
+import shlex
 import subprocess
 import sqlite3
 import sys
@@ -90,11 +91,23 @@ def setup(selected):
     if not hooks.is_absolute():
         hooks = ROOT / hooks
     hooks.mkdir(parents=True, exist_ok=True)
+    interpreter = shlex.quote(str(Path(sys.executable).absolute()))
     for name, command in [('pre-commit', 'guard-commit'), ('pre-push', 'guard-push "$@"')]:
         path = hooks / name
-        text = f'#!/bin/sh\n# scientific repository guard\nexec python3 tools/repository.py {command}\n'
-        if path.exists() and path.read_text() != text:
+        prefix = '#!/bin/sh\n# scientific repository guard\nexec '
+        suffix = f' tools/repository.py {command}\n'
+        text = prefix + interpreter + suffix
+        if path.is_symlink():
             raise ValueError(f'Existing {name} hook must be integrated, not overwritten')
+        if path.exists():
+            previous = path.read_text()
+            try:
+                executable = shlex.split(previous[len(prefix):])[0] if previous.startswith(prefix) else ''
+            except (ValueError, IndexError):
+                executable = ''
+            generated = prefix + shlex.quote(executable) + suffix
+            if previous != generated or (executable != 'python3' and not Path(executable).is_absolute()):
+                raise ValueError(f'Existing {name} hook must be integrated, not overwritten')
         path.write_text(text)
         path.chmod(0o755)
     print(f'Setup complete: role={selected}; LFS configured; ownership hooks installed; no commits created.')

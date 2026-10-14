@@ -2,7 +2,9 @@
 
 from contextlib import closing
 import importlib.util
+import os
 from pathlib import Path
+import shlex
 import shutil
 import sqlite3
 import subprocess
@@ -182,6 +184,59 @@ class RegistryTests(unittest.TestCase):
         refused = self.git('commit', '-m', 'Wrong branch', check=False)
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn('strictly on main', refused.stderr)
+
+    def test_hooks_pin_setup_interpreter_and_upgrade_generated_hooks(self):
+        hooks = self.root / '.git/hooks'
+        commands = {'pre-commit': 'guard-commit', 'pre-push': 'guard-push "$@"'}
+        prefix = '#!/bin/sh\n# scientific repository guard\nexec '
+        for name, command in commands.items():
+            (hooks / name).write_text(prefix + f'python3 tools/repository.py {command}\n')
+        executable = Path(self.temporary.name) / "Python env's $(false)" / 'python3'
+        executable.parent.mkdir()
+        executable.symlink_to(sys.executable)
+        invocation = [str(executable), str(self.root / 'tools/repository.py'), 'setup', '--role', 'LOCAL']
+        subprocess.run(invocation, check=True, capture_output=True, text=True)
+        expected = {name: prefix + shlex.quote(str(executable)) + f' tools/repository.py {command}\n'
+                    for name, command in commands.items()}
+        for name, text in expected.items():
+            self.assertEqual((hooks / name).read_text(), text)
+        subprocess.run(invocation, check=True, capture_output=True, text=True)
+        self.assertEqual({name: (hooks / name).read_text() for name in commands}, expected)
+        unavailable_python = Path(self.temporary.name) / 'old-python'
+        unavailable_python.mkdir()
+        replacement = unavailable_python / 'python3'
+        replacement.write_text('#!/bin/sh\nexit 97\n')
+        replacement.chmod(0o755)
+        environment = dict(os.environ, PATH=str(unavailable_python) + os.pathsep + os.environ['PATH'])
+        remote = Path(self.temporary.name) / 'remote.git'
+        subprocess.run(['git', 'init', '--quiet', '--bare', str(remote)], check=True)
+        self.git('remote', 'add', 'origin', str(remote))
+        for name, arguments in [('pre-commit', []), ('pre-push', ['origin', str(remote)])]:
+            result = subprocess.run([str(hooks / name), *arguments], cwd=self.root, env=environment,
+                                    input='', capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        self.tool('setup', '--role', 'LOCAL')
+        self.assertEqual((hooks / 'pre-commit').read_text(),
+                         prefix + shlex.quote(str(Path(sys.executable).absolute())) + ' tools/repository.py guard-commit\n')
+
+    def test_setup_preserves_unrelated_or_symlinked_hooks(self):
+        hook = self.root / '.git/hooks/pre-commit'
+        for content in ['#!/bin/sh\necho custom\n',
+                        '#!/bin/sh\n# scientific repository guard\nexec python3 tools/repository.py guard-commit\n# custom\n']:
+            with self.subTest(content=content):
+                hook.write_text(content)
+                refused = self.tool('setup', '--role', 'LOCAL', check=False)
+                self.assertNotEqual(refused.returncode, 0)
+                self.assertIn('must be integrated', refused.stderr)
+                self.assertEqual(hook.read_text(), content)
+        target = Path(self.temporary.name) / 'external-hook'
+        target.write_text('#!/bin/sh\n# scientific repository guard\nexec python3 tools/repository.py guard-commit\n')
+        hook.unlink()
+        hook.symlink_to(target)
+        refused = self.tool('setup', '--role', 'LOCAL', check=False)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertTrue(hook.is_symlink())
+        self.assertIn('exec python3 ', target.read_text())
 
 
 if __name__ == '__main__':
